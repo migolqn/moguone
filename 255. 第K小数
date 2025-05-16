@@ -1,0 +1,98 @@
+#include <cstdio>
+#include <cstring>
+#include <iostream>
+#include <algorithm>
+#include <vector>
+
+using namespace std;
+
+const int N = 100010, M = 10010;
+
+int n, m;
+int a[N];           // 原始数组
+vector<int> nums;    // 用于离散化的数组
+
+// 线段树节点结构体
+struct Node
+{
+    int l, r;       // 左右子节点编号
+    int cnt;        // 当前区间内元素个数
+}tr[N * 4 + N * 17]; // 主席树空间，N*4是初始线段树，N*17是更新时的节点
+
+int root[N], idx;   // root[i]保存第i个版本的根节点，idx是节点计数器
+
+// 离散化查找函数，返回x在nums中的下标
+int find(int x)
+{
+    return lower_bound(nums.begin(), nums.end(), x) - nums.begin();
+}
+
+// 构建初始空线段树
+int build(int l, int r)
+{
+    int p = ++ idx;     // 创建新节点
+    if (l == r) return p; // 叶子节点直接返回
+    int mid = l + r >> 1;
+    tr[p].l = build(l, mid), tr[p].r = build(mid + 1, r); // 递归构建左右子树
+    return p;
+}
+
+// 在p版本基础上，在位置x插入一个元素，返回新版本的根节点
+int insert(int p, int l, int r, int x)
+{
+    int q = ++ idx;     // 创建新节点
+    tr[q] = tr[p];      // 复制原节点信息
+    if (l == r)
+    {
+        tr[q].cnt ++ ;  // 找到目标位置，计数+1
+        return q;
+    }
+    int mid = l + r >> 1;
+    if (x <= mid) tr[q].l = insert(tr[p].l, l, mid, x); // 递归更新左子树
+    else tr[q].r = insert(tr[p].r, mid + 1, r, x);     // 递归更新右子树
+    tr[q].cnt = tr[tr[q].l].cnt + tr[tr[q].r].cnt;     // 更新当前节点的计数
+    return q;
+}
+
+// 查询区间[l,r]内第k小的数
+// q是右端点版本，p是左端点-1版本
+int query(int q, int p, int l, int r, int k)
+{
+    if (l == r) return r; // 找到目标位置
+    int cnt = tr[tr[q].l].cnt - tr[tr[p].l].cnt; // 计算左子树的元素个数差
+    int mid = l + r >> 1;
+    if (k <= cnt) return query(tr[q].l, tr[p].l, l, mid, k); // 在左子树中查找
+    else return query(tr[q].r, tr[p].r, mid + 1, r, k - cnt); // 在右子树中查找
+}
+
+int main()
+{
+    scanf("%d%d", &n, &m);
+    for (int i = 1; i <= n; i ++ )
+    {
+        scanf("%d", &a[i]);
+        nums.push_back(a[i]); // 收集所有数据用于离散化
+    }
+
+    // 离散化处理
+    sort(nums.begin(), nums.end());
+    nums.erase(unique(nums.begin(), nums.end()), nums.end());
+
+    // 构建初始空线段树（版本0）
+    root[0] = build(0, nums.size() - 1);
+
+    // 逐个插入元素，构建各个版本的主席树
+    for (int i = 1; i <= n; i ++ )
+        root[i] = insert(root[i - 1], 0, nums.size() - 1, find(a[i]));
+
+    // 处理查询
+    while (m -- )
+    {
+        int l, r, k;
+        scanf("%d%d%d", &l, &r, &k);
+        // 查询[l,r]区间第k小，并输出原始值（通过离散化数组转换）
+        printf("%d\n", nums[query(root[r], root[l - 1], 0, nums.size() - 1, k)]);
+    }
+
+    return 0;
+}
